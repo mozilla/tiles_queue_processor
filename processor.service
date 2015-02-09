@@ -1,0 +1,11 @@
+[Unit]
+Description=processor
+After=syslog.target network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/processor.py /etc/processor/config.yaml
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
