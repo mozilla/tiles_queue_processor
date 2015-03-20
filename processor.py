@@ -147,7 +147,7 @@ def main(config=Config()):
             print('Failed to get message body')
             continue
         try:
-            body = json.loads(json.loads(raw_body)['Message'].replace("'",'"'))
+            body = json.loads(json.loads(raw_body)['Message'].replace("u'",'"').replace("'",'"'))
         except Exception:
             print('Invalid message body: ' + raw_body)
             continue
