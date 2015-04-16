@@ -9,6 +9,13 @@ import signal
 import yaml
 
 from subprocess import call
+from sys import stdout
+
+
+def out(output):
+    stdout.write(str(output) + "\n")
+    # have to flush or systemd/journalctl will get messages out of order
+    stdout.flush()
 
 
 class Config:
@@ -27,7 +34,7 @@ class Config:
                 if getattr(self, key) != value:
                     setattr(self, key, value)
                 if self.print_config:
-                    print(self.__dict__)
+                    out(self.__dict__)
 
 
 sigint = signal.getsignal(signal.SIGINT)
@@ -56,7 +63,7 @@ s3 = boto.connect_s3()
 
 def pull_from_s3(bucket, key, destination):
     global s3
-    print('Downloading from s3://%s/%s to %s' % (bucket, key, destination))
+    out('Downloading from s3://%s/%s to %s' % (bucket, key, destination))
     s3bucket = s3.get_bucket(bucket, validate=False)
     s3key = s3bucket.get_key(key)
     if s3key:
@@ -102,7 +109,7 @@ def push_to_ddfs(blobs, master, tag_prefix, label):
             tag_prefix + label + ':' + blob[0],
             blob[1]
             ]
-	print('Executing: ' + ' '.join(command))
+	out('Executing: ' + ' '.join(command))
 	call(command)
 
 
@@ -138,24 +145,24 @@ def main(config=Config()):
     while True:
         message = queue.read(wait_time_seconds=20)
         if message is None:
-            #print('Queue is empty')
+            #out('Queue is empty')
             continue
         try:
             raw_body = message.get_body()
-            print('Message received')
+            out('Message received')
         except Exception:
-            print('Failed to get message body')
+            out('Failed to get message body')
             continue
         try:
             body = json.loads(json.loads(raw_body)['Message'].replace("u'",'"').replace("'",'"'))
         except Exception:
-            print('Invalid message body: ' + raw_body)
+            out('Invalid message body: ' + raw_body)
             continue
         try:
-            print('Processing: ' + str(body))
+            out('Processing: ' + str(body))
             process(message, body, config.ddfs_master, config.tag_prefix)
         except Exception:
-            print('Failed to process: ' + str(body))
+            out('Failed to process: ' + str(body))
             stoppable()
 
 
@@ -165,7 +172,7 @@ if __name__ == '__main__':
     args = argv[1:]
 
     if '-h' in args or '--help' in args:
-        print('Usage: %s [config.yaml]' % argv[0])
+        out('Usage: %s [config.yaml]' % argv[0])
     elif args:
         main(Config(args[0]))
     else:
