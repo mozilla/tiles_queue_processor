@@ -8,6 +8,7 @@ import os
 import signal
 import yaml
 
+from datadog import statsd
 from subprocess import call
 from sys import stdout
 
@@ -151,18 +152,28 @@ def main(config=Config()):
             raw_body = message.get_body()
             out('Message received')
         except Exception:
-            out('Failed to get message body')
+            msg = 'Failed to get message body'
+            out(msg)
+            statsd.event('SQS Message Error', msg, alert_type='error')
+            statsd.increment('tiles.processor.failed_get_body')
             continue
         try:
             body = json.loads(json.loads(raw_body)['Message'].replace("u'",'"').replace("'",'"'))
         except Exception:
-            out('Invalid message body: ' + raw_body)
+            msg = 'Invalid message body: ' + raw_body
+            out(msg)
+            statsd.event('JSON parse error', msg, alert_type='error')
+            statsd.increment('tiles.processor.invalid_body')
             continue
         try:
             out('Processing: ' + str(body))
             process(message, body, config.ddfs_master, config.tag_prefix)
+            statsd.increment('tiles.processor.processed')
         except Exception:
-            out('Failed to process: ' + str(body))
+            msg = 'Failed to process: ' + str(body)
+            out(msg)
+            statsd.increment('tiles.processor.failed_to_process')
+            statsd.event('Failed Processing message', msg, alert_type='error')
             stoppable()
 
 
