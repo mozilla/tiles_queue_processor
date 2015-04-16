@@ -8,6 +8,7 @@ import os
 import signal
 import yaml
 
+from datadog import statsd
 from subprocess import call
 
 
@@ -145,17 +146,21 @@ def main(config=Config()):
             print('Message received')
         except Exception:
             print('Failed to get message body')
+            statsd.increment('tiles.processor.failed_get_body')
             continue
         try:
             body = json.loads(json.loads(raw_body)['Message'].replace("u'",'"').replace("'",'"'))
         except Exception:
             print('Invalid message body: ' + raw_body)
+            statsd.increment('tiles.processor.invalid_body')
             continue
         try:
             print('Processing: ' + str(body))
             process(message, body, config.ddfs_master, config.tag_prefix)
+            statsd.increment('tiles.processor.processed')
         except Exception:
             print('Failed to process: ' + str(body))
+            statsd.increment('tiles.processor.failed_to_process')
             stoppable()
 
 
