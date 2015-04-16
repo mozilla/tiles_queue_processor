@@ -10,6 +10,13 @@ import yaml
 
 from datadog import statsd
 from subprocess import call
+from sys import stdout
+
+
+def out(output):
+    stdout.write(str(output) + "\n")
+    # have to flush or systemd/journalctl will get messages out of order
+    stdout.flush()
 
 
 class Config:
@@ -28,7 +35,7 @@ class Config:
                 if getattr(self, key) != value:
                     setattr(self, key, value)
                 if self.print_config:
-                    print(self.__dict__)
+                    out(self.__dict__)
 
 
 sigint = signal.getsignal(signal.SIGINT)
@@ -57,7 +64,7 @@ s3 = boto.connect_s3()
 
 def pull_from_s3(bucket, key, destination):
     global s3
-    print('Downloading from s3://%s/%s to %s' % (bucket, key, destination))
+    out('Downloading from s3://%s/%s to %s' % (bucket, key, destination))
     s3bucket = s3.get_bucket(bucket, validate=False)
     s3key = s3bucket.get_key(key)
     if s3key:
@@ -103,7 +110,7 @@ def push_to_ddfs(blobs, master, tag_prefix, label):
             tag_prefix + label + ':' + blob[0],
             blob[1]
             ]
-	print('Executing: ' + ' '.join(command))
+	out('Executing: ' + ' '.join(command))
 	call(command)
 
 
@@ -139,14 +146,14 @@ def main(config=Config()):
     while True:
         message = queue.read(wait_time_seconds=20)
         if message is None:
-            #print('Queue is empty')
+            #out('Queue is empty')
             continue
         try:
             raw_body = message.get_body()
-            print('Message received')
+            out('Message received')
         except Exception:
             msg = 'Failed to get message body'
-            print(msg)
+            out(msg)
             statsd.event('SQS Message Error', msg, alert_type='error')
             statsd.increment('tiles.processor.failed_get_body')
             continue
@@ -154,17 +161,17 @@ def main(config=Config()):
             body = json.loads(json.loads(raw_body)['Message'].replace("u'",'"').replace("'",'"'))
         except Exception:
             msg = 'Invalid message body: ' + raw_body
-            print(msg)
+            out(msg)
             statsd.event('JSON parse error', msg, alert_type='error')
             statsd.increment('tiles.processor.invalid_body')
             continue
         try:
-            print('Processing: ' + str(body))
+            out('Processing: ' + str(body))
             process(message, body, config.ddfs_master, config.tag_prefix)
             statsd.increment('tiles.processor.processed')
         except Exception:
             msg = 'Failed to process: ' + str(body)
-            print(msg)
+            out(msg)
             statsd.increment('tiles.processor.failed_to_process')
             statsd.event('Failed Processing message', msg, alert_type='error')
             stoppable()
@@ -176,7 +183,7 @@ if __name__ == '__main__':
     args = argv[1:]
 
     if '-h' in args or '--help' in args:
-        print('Usage: %s [config.yaml]' % argv[0])
+        out('Usage: %s [config.yaml]' % argv[0])
     elif args:
         main(Config(args[0]))
     else:
